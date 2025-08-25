@@ -1,0 +1,6 @@
+{
+  "appId": "com.dosemate.app",
+  "appName": "DoseMate",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
