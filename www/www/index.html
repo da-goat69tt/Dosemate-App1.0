@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart MedBox Controller</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 400px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4444;
+            margin-left: 10px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background: #4CAF50;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:last-child {
+            margin-bottom: 0;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(76, 175, 80, 0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 68, 68, 0.3);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .status-display {
+            background: #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+        }
+
+        .time-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-group label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .input-group input {
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .schedule-item {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .dose-status {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .dose-item {
+            text-align: center;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .dose-taken {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+
+        .dose-pending {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f1b5bc;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-weight: 600;
+            display: none;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f1b5bc;
+        }
+
+        .alert.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .permission-prompt {
+            text-align: center;
+            padding: 20px;
+            background: #fff3cd;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ffeaa7;
+            display: none;
+        }
+
+        .permission-prompt.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Smart MedBox 💊</h1>
+            <p>Bluetooth Status: <span id="connectionStatus">Disconnected</span><span class="status-indicator" id="statusIndicator"></span></p>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        <div class="permission-prompt" id="permissionPrompt">
+            <h3>Bluetooth Permission Required</h3>
+            <p>Please allow Bluetooth access to connect to your MedBox</p>
+            <button class="btn btn-primary" onclick="requestBluetoothPermission()">Allow Bluetooth</button>
+        </div>
+
+        <!-- Connection Section -->
+        <div class="section">
+            <h3>📡 Connection</h3>
+            <button class="btn btn-primary" onclick="connectBluetooth()">Connect to MedBox</button>
+            <button class="btn btn-secondary" onclick="disconnectBluetooth()">Disconnect</button>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="section">
+            <h3>⚡ Quick Actions</h3>
+            <button class="btn btn-success" onclick="dispenseMedicine()">Dispense Medicine</button>
+            <button class="btn btn-danger" onclick="emergencyDispense()">🚨 Emergency Dispense</button>
+            <button class="btn btn-secondary" onclick="getStatus()">Get Status</button>
+        </div>
+
+        <!-- Status Display -->
+        <div class="section">
+            <h3>📊 Device Status</h3>
+            <div class="status-display" id="statusDisplay">
+                Ready to connect...
+            </div>
+            
+            <div class="dose-status">
+                <div class="dose-item dose-pending" id="dose0">Dose 1<br>Pending</div>
+                <div class="dose-item dose-pending" id="dose1">Dose 2<br>Pending</div>
+                <div class="dose-item dose-pending" id="dose2">Dose 3<br>Pending</div>
+                <div class="dose-item dose-pending" id="dose3">Dose 4<br>Pending</div>
+            </div>
+        </div>
+
+        <!-- Time Settings -->
+        <div class="section">
+            <h3>⏰ Set Time</h3>
+            <div class="time-inputs">
+                <div class="input-group">
+                    <label>Date</label>
+                    <input type="date" id="dateInput">
+                </div>
+                <div class="input-group">
+                    <label>Time</label>
+                    <input type="time" id="timeInput">
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="setTime()">Update Time</button>
+        </div>
+
+        <!-- Medication Schedule -->
+        <div class="section">
+            <h3>💊 Medication Schedule</h3>
+            <div class="schedule-grid">
+                <div class="schedule-item">
+                    <div>Morning</div>
+                    <input type="time" id="time1" value="08:00">
+                </div>
+                <div class="schedule-item">
+                    <div>Noon</div>
+                    <input type="time" id="time2" value="12:00">
+                </div>
+                <div class="schedule-item">
+                    <div>Evening</div>
+                    <input type="time" id="time3" value="18:00">
+                </div>
+                <div class="schedule-item">
+                    <div>Night</div>
+                    <input type="time" id="time4" value="22:00">
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="setSchedule()">Update Schedule</button>
+            <button class="btn btn-secondary" onclick="resetDaily()">Reset Daily Doses</button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Connecting to MedBox...</p>
+        </div>
+
+        <div class="footer">
+            <p>Smart MedBox Controller v1.0</p>
+            <p>Ensure your device supports Web Bluetooth</p>
+        </div>
+    </div>
+
+    <script>
+        let bluetoothDevice;
+        let bluetoothCharacteristic;
+        let isConnected = false;
+        let bluetoothAvailable = false;
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if Web Bluetooth is available
+            if (!navigator.bluetooth) {
+                showAlert('Web Bluetooth is not supported in this browser.', 'error');
+                updateStatus('Web Bluetooth not supported');
+                return;
+            }
+            
+            bluetoothAvailable = true;
+            
+            // Set current date and time
+            const now = new Date();
+            document.getElementById('dateInput').valueAsDate = now;
+            document.getElementById('timeInput').value = now.toTimeString().slice(0,5);
+            
+            updateStatus('App loaded. Ready to connect.');
+            
+            // Show permission prompt if needed
+            checkBluetoothPermission();
+        });
+
+        function checkBluetoothPermission() {
+            if (!bluetoothAvailable) return;
+            
+            // Check if we already have permission
+            navigator.bluetooth.getAvailability()
+                .then(available => {
+                    if (available) {
+                        document.getElementById('permissionPrompt').classList.remove('show');
+                    } else {
+                        document.getElementById('permissionPrompt').classList.add('show');
+                    }
+                })
+                .catch(error => {
+                    console.error('Bluetooth availability check failed:', error);
+                    document.getElementById('permissionPrompt').classList.add('show');
+                });
+        }
+
+        function requestBluetoothPermission() {
+            if (!bluetoothAvailable) {
+                showAlert('Web Bluetooth is not supported in this browser.', 'error');
+                return;
+            }
+            
+            // Request Bluetooth availability
+            navigator.bluetooth.getAvailability()
+                .then(available => {
+                    if (available) {
+                        document.getElementById('permissionPrompt').classList.remove('show');
+                        showAlert('Bluetooth access granted!', 'success');
+                    } else {
+                        showAlert('Please enable Bluetooth on your device.', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Bluetooth permission request failed:', error);
+                    showAlert('Failed to get Bluetooth permission: ' + error.message, 'error');
+                });
+        }
+
+        async function connectBluetooth() {
+            if (!bluetoothAvailable) {
+                showAlert('Web Bluetooth is not supported in this browser.', 'error');
+                return;
+            }
+
+            showLoading(true);
+            
+            try {
+                updateStatus('Scanning for MedBox...');
+                
+                // Request Bluetooth device with HC-05 service UUID
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{
+                        name: 'HC-05' // HC-05 default name
+                    }],
+                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb'] // HC-05 service UUID
+                });
+
+                updateStatus('Connecting to ' + bluetoothDevice.name + '...');
+                
+                // Connect to GATT server
+                const server = await bluetoothDevice.gatt.connect();
+                
+                // Get the service
+                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+                
+                // Get the characteristic
+                bluetoothCharacteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+
+                // Set up notifications
+                await bluetoothCharacteristic.startNotifications();
+                bluetoothCharacteristic.addEventListener('characteristicvaluechanged', handleNotifications);
+
+                isConnected = true;
+                updateConnectionStatus(true);
+                updateStatus('Connected to MedBox successfully!');
+                showAlert('Connected to MedBox!', 'success');
+                
+                // Hide permission prompt
+                document.getElementById('permissionPrompt').classList.remove('show');
+                
+                // Get initial status
+                setTimeout(getStatus, 1000);
+
+            } catch (error) {
+                console.error('Bluetooth connection failed:', error);
+                updateStatus('Connection failed: ' + error.message);
+                showAlert('Connection failed: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function disconnectBluetooth() {
+            if (bluetoothDevice && bluetoothDevice.gatt.connected) {
+                bluetoothDevice.gatt.disconnect();
+                isConnected = false;
+                updateConnectionStatus(false);
+                updateStatus('Disconnected from MedBox.');
+                showAlert('Disconnected from MedBox.', 'success');
+            } else {
+                showAlert('Not connected to any device.', 'error');
+            }
+        }
+
+        async function sendCommand(command) {
+            if (!isConnected || !bluetoothCharacteristic) {
+                showAlert('Not connected to MedBox!', 'error');
+                return false;
+            }
+
+            try {
+                // Add newline character for Arduino serial parsing
+                const encoder = new TextEncoder();
+                await bluetoothCharacteristic.writeValue(encoder.encode(command + '\n'));
+                updateStatus('Sent: ' + command);
+                return true;
+            } catch (error) {
+                console.error('Send failed:', error);
+                updateStatus('Send failed: ' + error.message);
+                showAlert('Command failed: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        function handleNotifications(event) {
+            const decoder = new TextDecoder();
+            const data = decoder.decode(event.target.value);
+            updateStatus('Received: ' + data);
+            
+            // Parse responses
+            if (data.startsWith('STATUS:')) {
+                parseStatus(data.substring(7));
+            } else if (data.includes('DISPENSED')) {
+                showAlert('Medicine dispensed successfully!', 'success');
+            } else if (data.includes('ERROR')) {
+                showAlert('Device error: ' + data, 'error');
+            }
+        }
+
+        function dispenseMedicine() {
+            sendCommand('DISPENSE');
+        }
+
+        function emergencyDispense() {
+            sendCommand('EMERGENCY');
+        }
+
+        function getStatus() {
+            sendCommand('STATUS');
+        }
+
+        function setTime() {
+            const date = document.getElementById('dateInput').value;
+            const time = document.getElementById('timeInput').value;
+            
+            if (!date || !time) {
+                showAlert('Please select both date and time.', 'error');
+                return;
+            }
+            
+            // Format for Arduino: YYYY-MM-DD,HH:MM
+            sendCommand(`SETTIME:${date},${time}`);
+        }
+
+        function setSchedule() {
+            const times = [
+                document.getElementById('time1').value,
+                document.getElementById('time2').value,
+                document.getElementById('time3').value,
+                document.getElementById('time4').value
+            ];
+            
+            // Validate all times are set
+            if (times.some(time => !time)) {
+                showAlert('Please set all schedule times.', 'error');
+                return;
+            }
+            
+            // Format for Arduino: HH:MM,HH:MM,HH:MM,HH:MM
+            sendCommand(`SCHEDULE:${times.join(',')}`);
+        }
+
+        function resetDaily() {
+            sendCommand('RESET');
+        }
+
+        function parseStatus(statusData) {
+            // Example status format: "2023-12-01,14:30,1,0,1,0"
+            const parts = statusData.split(',');
+            
+            if (parts.length >= 6) {
+                // Update dose statuses
+                for (let i = 2; i < 6; i++) {
+                    const doseElement = document.getElementById(`dose${i-2}`);
+                    if (parts[i] === '1') {
+                        doseElement.className = 'dose-item dose-taken';
+                        doseElement.innerHTML = `Dose ${i-1}<br>Taken`;
+                    } else {
+                        doseElement.className = 'dose-item dose-pending';
+                        doseElement.innerHTML = `Dose ${i-1}<br>Pending`;
+                    }
+                }
+                
+                showAlert('Status updated successfully.', 'success');
+            }
+        }
+
+        function updateStatus(message) {
+            const statusDisplay = document.getElementById('statusDisplay');
+            statusDisplay.innerHTML = message + '<br>' + statusDisplay.innerHTML;
+            
+            // Keep only the last 10 messages
+            const messages = statusDisplay.innerHTML.split('<br>');
+            if (messages.length > 10) {
+                statusDisplay.innerHTML = messages.slice(0, 10).join('<br>');
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connectionStatus');
+            const indicatorElement = document.getElementById('statusIndicator');
+            
+            if (connected) {
+                statusElement.textContent = 'Connected';
+                indicatorElement.classList.add('connected');
+            } else {
+                statusElement.textContent = 'Disconnected';
+                indicatorElement.classList.remove('connected');
+            }
+        }
+
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertElement = document.createElement('div');
+            alertElement.className = `alert ${type} show`;
+            alertElement.textContent = message;
+            
+            alertContainer.appendChild(alertElement);
+            
+            // Remove alert after 5 seconds
+            setTimeout(() => {
+                alertElement.remove();
+            }, 5000);
+        }
+
+        function showLoading(show) {
+            const loadingElement = document.getElementById('loading');
+            if (show) {
+                loadingElement.classList.add('show');
+            } else {
+                loadingElement.classList.remove('show');
+            }
+        }
+    </script>
+</body>
+</html>
