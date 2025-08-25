@@ -16,11 +16,14 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         .container {
             max-width: 400px;
-            margin: 0 auto;
+            width: 100%;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             border-radius: 20px;
@@ -279,6 +282,20 @@
             from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        .permission-prompt {
+            text-align: center;
+            padding: 20px;
+            background: #fff3cd;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ffeaa7;
+            display: none;
+        }
+
+        .permission-prompt.show {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -289,6 +306,12 @@
         </div>
 
         <div id="alertContainer"></div>
+
+        <div class="permission-prompt" id="permissionPrompt">
+            <h3>Bluetooth Permission Required</h3>
+            <p>Please allow Bluetooth access to connect to your MedBox</p>
+            <button class="btn btn-primary" onclick="requestBluetoothPermission()">Allow Bluetooth</button>
+        </div>
 
         <!-- Connection Section -->
         <div class="section">
@@ -376,19 +399,72 @@
         let bluetoothDevice;
         let bluetoothCharacteristic;
         let isConnected = false;
+        let bluetoothAvailable = false;
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
+            // Check if Web Bluetooth is available
+            if (!navigator.bluetooth) {
+                showAlert('Web Bluetooth is not supported in this browser.', 'error');
+                updateStatus('Web Bluetooth not supported');
+                return;
+            }
+            
+            bluetoothAvailable = true;
+            
             // Set current date and time
             const now = new Date();
             document.getElementById('dateInput').valueAsDate = now;
             document.getElementById('timeInput').value = now.toTimeString().slice(0,5);
             
             updateStatus('App loaded. Ready to connect.');
+            
+            // Show permission prompt if needed
+            checkBluetoothPermission();
         });
 
+        function checkBluetoothPermission() {
+            if (!bluetoothAvailable) return;
+            
+            // Check if we already have permission
+            navigator.bluetooth.getAvailability()
+                .then(available => {
+                    if (available) {
+                        document.getElementById('permissionPrompt').classList.remove('show');
+                    } else {
+                        document.getElementById('permissionPrompt').classList.add('show');
+                    }
+                })
+                .catch(error => {
+                    console.error('Bluetooth availability check failed:', error);
+                    document.getElementById('permissionPrompt').classList.add('show');
+                });
+        }
+
+        function requestBluetoothPermission() {
+            if (!bluetoothAvailable) {
+                showAlert('Web Bluetooth is not supported in this browser.', 'error');
+                return;
+            }
+            
+            // Request Bluetooth availability
+            navigator.bluetooth.getAvailability()
+                .then(available => {
+                    if (available) {
+                        document.getElementById('permissionPrompt').classList.remove('show');
+                        showAlert('Bluetooth access granted!', 'success');
+                    } else {
+                        showAlert('Please enable Bluetooth on your device.', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Bluetooth permission request failed:', error);
+                    showAlert('Failed to get Bluetooth permission: ' + error.message, 'error');
+                });
+        }
+
         async function connectBluetooth() {
-            if (!navigator.bluetooth) {
+            if (!bluetoothAvailable) {
                 showAlert('Web Bluetooth is not supported in this browser.', 'error');
                 return;
             }
@@ -398,10 +474,10 @@
             try {
                 updateStatus('Scanning for MedBox...');
                 
-                // Request Bluetooth device
+                // Request Bluetooth device with HC-05 service UUID
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
                     filters: [{
-                        name: 'HC-05' // or whatever your HC-05 is named
+                        name: 'HC-05' // HC-05 default name
                     }],
                     optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb'] // HC-05 service UUID
                 });
@@ -410,7 +486,11 @@
                 
                 // Connect to GATT server
                 const server = await bluetoothDevice.gatt.connect();
+                
+                // Get the service
                 const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+                
+                // Get the characteristic
                 bluetoothCharacteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
 
                 // Set up notifications
@@ -421,6 +501,9 @@
                 updateConnectionStatus(true);
                 updateStatus('Connected to MedBox successfully!');
                 showAlert('Connected to MedBox!', 'success');
+                
+                // Hide permission prompt
+                document.getElementById('permissionPrompt').classList.remove('show');
                 
                 // Get initial status
                 setTimeout(getStatus, 1000);
@@ -441,6 +524,8 @@
                 updateConnectionStatus(false);
                 updateStatus('Disconnected from MedBox.');
                 showAlert('Disconnected from MedBox.', 'success');
+            } else {
+                showAlert('Not connected to any device.', 'error');
             }
         }
 
@@ -451,8 +536,9 @@
             }
 
             try {
+                // Add newline character for Arduino serial parsing
                 const encoder = new TextEncoder();
-                await bluetoothCharacteristic.writeValue(encoder.encode(command));
+                await bluetoothCharacteristic.writeValue(encoder.encode(command + '\n'));
                 updateStatus('Sent: ' + command);
                 return true;
             } catch (error) {
@@ -471,5 +557,127 @@
             // Parse responses
             if (data.startsWith('STATUS:')) {
                 parseStatus(data.substring(7));
-            } else if (data === 'DISPENSED') {
+            } else if (data.includes('DISPENSED')) {
                 showAlert('Medicine dispensed successfully!', 'success');
+            } else if (data.includes('ERROR')) {
+                showAlert('Device error: ' + data, 'error');
+            }
+        }
+
+        function dispenseMedicine() {
+            sendCommand('DISPENSE');
+        }
+
+        function emergencyDispense() {
+            sendCommand('EMERGENCY');
+        }
+
+        function getStatus() {
+            sendCommand('STATUS');
+        }
+
+        function setTime() {
+            const date = document.getElementById('dateInput').value;
+            const time = document.getElementById('timeInput').value;
+            
+            if (!date || !time) {
+                showAlert('Please select both date and time.', 'error');
+                return;
+            }
+            
+            // Format for Arduino: YYYY-MM-DD,HH:MM
+            sendCommand(`SETTIME:${date},${time}`);
+        }
+
+        function setSchedule() {
+            const times = [
+                document.getElementById('time1').value,
+                document.getElementById('time2').value,
+                document.getElementById('time3').value,
+                document.getElementById('time4').value
+            ];
+            
+            // Validate all times are set
+            if (times.some(time => !time)) {
+                showAlert('Please set all schedule times.', 'error');
+                return;
+            }
+            
+            // Format for Arduino: HH:MM,HH:MM,HH:MM,HH:MM
+            sendCommand(`SCHEDULE:${times.join(',')}`);
+        }
+
+        function resetDaily() {
+            sendCommand('RESET');
+        }
+
+        function parseStatus(statusData) {
+            // Example status format: "2023-12-01,14:30,1,0,1,0"
+            const parts = statusData.split(',');
+            
+            if (parts.length >= 6) {
+                // Update dose statuses
+                for (let i = 2; i < 6; i++) {
+                    const doseElement = document.getElementById(`dose${i-2}`);
+                    if (parts[i] === '1') {
+                        doseElement.className = 'dose-item dose-taken';
+                        doseElement.innerHTML = `Dose ${i-1}<br>Taken`;
+                    } else {
+                        doseElement.className = 'dose-item dose-pending';
+                        doseElement.innerHTML = `Dose ${i-1}<br>Pending`;
+                    }
+                }
+                
+                showAlert('Status updated successfully.', 'success');
+            }
+        }
+
+        function updateStatus(message) {
+            const statusDisplay = document.getElementById('statusDisplay');
+            statusDisplay.innerHTML = message + '<br>' + statusDisplay.innerHTML;
+            
+            // Keep only the last 10 messages
+            const messages = statusDisplay.innerHTML.split('<br>');
+            if (messages.length > 10) {
+                statusDisplay.innerHTML = messages.slice(0, 10).join('<br>');
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connectionStatus');
+            const indicatorElement = document.getElementById('statusIndicator');
+            
+            if (connected) {
+                statusElement.textContent = 'Connected';
+                indicatorElement.classList.add('connected');
+            } else {
+                statusElement.textContent = 'Disconnected';
+                indicatorElement.classList.remove('connected');
+            }
+        }
+
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertElement = document.createElement('div');
+            alertElement.className = `alert ${type} show`;
+            alertElement.textContent = message;
+            
+            alertContainer.appendChild(alertElement);
+            
+            // Remove alert after 5 seconds
+            setTimeout(() => {
+                alertElement.remove();
+            }, 5000);
+        }
+
+        function showLoading(show) {
+            const loadingElement = document.getElementById('loading');
+            if (show) {
+                loadingElement.classList.add('show');
+            } else {
+                loadingElement.classList.remove('show');
+            }
+        }
+    </script>
+</body>
+</html>
